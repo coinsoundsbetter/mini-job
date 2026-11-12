@@ -16,7 +16,6 @@ internal sealed class JobNode
     internal bool Done => Status is JobStatus.Succeeded or JobStatus.Faulted or JobStatus.Skipped;
 }
 
-// 每次实际失败拥有独立记录；依赖汇合时按记录身份去重。
 internal sealed class JobFailure(Exception error)
 {
     internal readonly Exception Error = error;

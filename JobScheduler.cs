@@ -399,8 +399,7 @@ public sealed class JobScheduler : IDisposable
         lock (gate)
             return node.Status;
     }
-
-    // 外部线程可阻塞等待；worker 必须通过依赖表达执行顺序，不能阻塞等待未完成任务。
+    
     internal void Complete(JobNode node)
     {
         if (currentScheduler != null && currentScheduler != this)
