@@ -1,57 +1,39 @@
 using System;
+using MiniJob;
 
-internal static class Program
+public static class Program
 {
-    private static void Main(string[] args)
+    private struct SquareJob : IJobFor
     {
-        if (Array.IndexOf(args, "--test") >= 0)
+        public int[] Values;
+
+        public void Execute(int index)
         {
-            JobSystemTests.RunAll();
-            return;
+            Values[index] *= Values[index];
         }
-        const int particleCount = 100_000;
-        const float deltaTime = 1f / 60f;
-        using var positions = new JobBuffer<float>(particleCount);
-        using var velocities = new JobBuffer<float>(particleCount);
-        using var maximum = new JobBuffer<float>(1);
-        for (int i = 0; i < particleCount; i++) velocities[i] = 60f;
-
-        int workerCount = Math.Max(1, Environment.ProcessorCount - 1);
-        using var jobs = new JobSystem(workerCount);
-
-        JobHandle update = new MoveParticles
-        {
-            Positions = positions, Velocities = velocities, DeltaTime = deltaTime
-        }.ScheduleParallel(jobs, particleCount, batchSize: 1024);
-
-        JobHandle bounds = jobs.Schedule(() =>
-        {
-            float value = 0f;
-            for (int i = 0; i < positions.Length; i++) value = Math.Max(value, positions[i]);
-            maximum[0] = value;
-        }, new[] { positions.ReadOnly, maximum.WriteOnly }, update);
-
-        JobHandle apply = jobs.ScheduleMainThread(() =>
-            Console.WriteLine($"Maximum position: {maximum[0]}"), new[] { maximum.ReadOnly }, bounds);
-
-        // The main thread can do independent frame work before reaching this point.
-        apply.Complete();
-        for (int i = 0; i < positions.Length; i++)
-        {
-            if (Math.Abs(positions[i] - 1f) > 0.00001f)
-                throw new InvalidOperationException("A particle was updated incorrectly.");
-        }
-
-        Console.WriteLine($"Workers: {workerCount}");
-        Console.WriteLine($"Particles updated: {positions.Length:N0}");
     }
 
-    private struct MoveParticles : IJobFor, IJobResources
+    public static void Main(string[] args)
     {
-        public JobBuffer<float> Positions;
-        public JobBuffer<float> Velocities;
-        public float DeltaTime;
-        public void Execute(int index) => Positions[index] += Velocities[index] * DeltaTime;
-        public JobAccess[] GetAccesses() => new[] { Positions.ReadWrite, Velocities.ReadOnly };
+        if (args.Length == 1 && args[0] == "--test")
+        {
+            JobSchedulerTests.Run();
+            return;
+        }
+        if (args.Length > 0 && args[0] == "--benchmark")
+        {
+            JobBenchmarks.Run(args);
+            return;
+        }
+
+        using var scheduler = new JobScheduler();
+        int[] values = { 1, 2, 3, 4 };
+
+        // 提交 Job，每批处理 2 个元素。
+        var handle = scheduler.ScheduleParallel(new SquareJob { Values = values }, values.Length, batchSize: 2);
+
+        // 等待所有批次执行完毕，再读取结果。
+        handle.Complete();
+        Console.WriteLine(string.Join(", ", values));
     }
 }
