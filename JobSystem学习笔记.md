@@ -1,4 +1,4 @@
-# Job System 学习笔记
+# Job System note
 
 ## 1. 当前版本的定位
 
